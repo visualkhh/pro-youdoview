@@ -2,6 +2,7 @@ import {config} from "@src/config";
 import {RGBA} from "@src/model/RGBA";
 import {MathUtil} from "@src/math/MathUtil";
 import {Dot} from "@src/model/Dot";
+import {RandomUtil} from "@src/random/RandomUtil";
 
 const {range, fromEvent, interval, Observable, of, Subscription, timer} = require('rxjs');
 const {map, filter, catchError} = require('rxjs/operators');
@@ -35,20 +36,20 @@ class Engine {
     //         this.loopCapture();
     //     }, 1)
     // }
-    capture(pause = true) {
-        this.video.currentTime = this.video.currentTime + (1 / 5);
+    capture(time: number, pause = true) {
+        this.video.currentTime = this.video.currentTime + time;
         if (pause)
             this.video.pause();
         const width = this.video.videoWidth;
         const height = this.video.videoHeight;
 
         const movePx = 3;
-        const angle = 1;
+        const angle = 3;
         const scaleUp = 1.02;
         const scaleDown = 0.98;
-        const diffSize = 10;
-        const dotGroupWidthPercentSize = 1;
-        const dotAvgSize = 5;
+        const diffSize = 2;
+        const dotGroupBoxSize = 4;
+        const dotAvgSize = 1;
 
         // original
         const original2D = this.buffer2D;
@@ -228,38 +229,38 @@ class Engine {
             for (let x = 0; x < boundaryPixels[y].length; x++) {
                 let pixel = boundaryPixels[y][x];
                 let imageDataIndex = this.getImageDataIndex(dotImageData.width, x, y);
-                if(pixel.r && pixel.g && pixel.b) {
-                dotImageData.data[imageDataIndex] = pixel.r;
-                dotImageData.data[imageDataIndex + 1] = pixel.g;
-                dotImageData.data[imageDataIndex + 2] = pixel.b;
-                dotImageData.data[imageDataIndex + 3] = 255;
+                if (pixel.r && pixel.g && pixel.b) {
+                    dotImageData.data[imageDataIndex] = pixel.r;
+                    dotImageData.data[imageDataIndex + 1] = pixel.g;
+                    dotImageData.data[imageDataIndex + 2] = pixel.b;
+                    dotImageData.data[imageDataIndex + 3] = 255;
                 }
             }
         }
         dot2D.putImageData(dotImageData, 0, 0);
         const dots = new Array<Array<Dot>>();
         dot2D.strokeStyle = "#FF0000";
-        // let boxPx = MathUtil.getValueByTotInPercent(dot2D.canvas.width, dotGroupWidthPercentSize);
-        let boxPx = 4;
-        for (let y = 0; y < dot2D.canvas.height; y+= boxPx) {
-            let h = boxPx;
+        // let boxPx = MathUtil.getValueByTotInPercent(dot2D.canvas.width, dotGroupWidthHeigtSize);
+        for (let y = 0; y < dot2D.canvas.height; y += dotGroupBoxSize) {
+            let h = dotGroupBoxSize;
             let distH = y + h;
             h = (distH > dot2D.canvas.height ? h - (distH - dot2D.canvas.height) : h);
             const dotRow = new Array<Dot>();
-            for (let x = 0; x < dot2D.canvas.width; x += boxPx) {
-                let w = boxPx;
+            for (let x = 0; x < dot2D.canvas.width; x += dotGroupBoxSize) {
+                let w = dotGroupBoxSize;
                 let distW = x + h;
                 w = (distW > dot2D.canvas.width ? w - (distH - dot2D.canvas.width) : w);
                 let avgColor = this.getAvgColor(boundary2D.getImageData(x, y, w, h));
-                // let avgColor = this.getAvgColor(original2D.getImageData(x, y, w, h));
+                let avgBGColor = this.getAvgColor(original2D.getImageData(x, y, w, h));
                 // console.log(avgColor.rgbHex);
                 dot2D.strokeStyle = avgColor.rgbHex;
                 dot2D.fillStyle = avgColor.rgbHex;
                 // dot2D.fillRect(x, y, w, h);
                 let dot = new Dot(x, y, w, h, avgColor, false);
-                if(this.checkDiff(avgColor.r, avgColor.b, avgColor.g, dotAvgSize)) {
+                dot.bgColor = avgBGColor;
+                if (this.checkDiff(avgColor.r, avgColor.b, avgColor.g, dotAvgSize)) {
                     dot2D.beginPath();
-                    dot2D.arc(dot.centerX, dot.centerY, 3, 0, Math.PI*2, true);
+                    dot2D.arc(dot.centerX, dot.centerY, 3, 0, Math.PI * 2, true);
                     dot2D.fill();
                     dot2D.closePath();
                     dot.draw = true;
@@ -282,107 +283,31 @@ class Engine {
         //line
         let line2D = this.buffer2D;
         let lineImageData = line2D.getImageData(0, 0, width, height);
-        for (let y = 1; y < dots.length - 1; y+=2) {
-            for (let x = 1; x < dots[y].length - 1; x+=2) {
-                let it = dots[y][x];
-                let nxt = dots[y][x + 1];
-                let pxt = dots[y][x - 1];
-                let nyt = dots[y + 1][x];
-                let pyt = dots[y - 1][x];
-                let nx_nyt = dots[y + 1][x + 1];
-                let nx_pyt = dots[y - 1][x + 1];
-                let px_nyt = dots[y + 1][x - 1];
-                let px_pyt = dots[y - 1][x - 1];
+        // // bg
+        for (let y = 0; y < dots.length; y++) {
+            for (let x = 0; x < dots[y].length; x++) {
+                let dot = dots[y][x];
+                line2D.fillStyle = "rgba("+dot.bgColor.r.toFixed()+","+dot.bgColor.g.toFixed()+","+dot.bgColor.b.toFixed()+",0.2)";
+                line2D.fillRect(dot.x, dot.y, dot.w, dot.h);
+            }
+        }
 
-                it.around = [pyt, nx_pyt, nxt, nx_nyt, nyt, px_nyt, pxt, px_pyt];
-                pyt.around = [nx_pyt, nxt, it, pxt, px_pyt];
-                nx_pyt.around = [nxt, it, pyt];
-                nxt.around = [nx_nyt, nyt, it, pxt, nx_pyt];
-                nx_nyt.around = [nyt, it, nx_pyt];
-                nyt.around = [px_nyt, pxt, px_pyt, pyt, it];
-                px_nyt.around = [pxt, px_pyt, pyt, it, nyt];
-                pxt.around = [px_pyt, pyt, it, nyt, px_nyt];
-                px_pyt.around = [pyt, it, pxt];
-
-                const lineTars = new Array<Dot>();
-                if(it.isBoundary)
-                    lineTars.push(it);
-                if(pyt.isBoundary)
-                    lineTars.push(pyt);
-                if(nx_pyt.isBoundary)
-                    lineTars.push(nx_pyt);
-                if(nxt.isBoundary)
-                    lineTars.push(nxt);
-                if(nx_nyt.isBoundary)
-                    lineTars.push(nx_nyt);
-                if(nyt.isBoundary)
-                    lineTars.push(nyt);
-                if(px_nyt.isBoundary)
-                    lineTars.push(px_nyt);
-                if(pxt.isBoundary)
-                    lineTars.push(pxt);
-                if(px_pyt.isBoundary)
-                    lineTars.push(px_pyt);
-                // console.log('--', lineTars)
-                this.drawLines(line2D, lineTars);
-
-                // if(it.isBoundary && pyt.isBoundary) {
-                //     line2D.beginPath();
-                //     line2D.moveTo(it.centerX, it.centerY);
-                //     line2D.lineTo(pyt.centerX, pyt.centerY);
-                //     line2D.stroke();
-                //     line2D.closePath()
-                // }
-                // if(it.isBoundary && nx_pyt.isBoundary) {
-                //     line2D.beginPath();
-                //     line2D.moveTo(it.centerX, it.centerY);
-                //     line2D.lineTo(nx_pyt.centerX, nx_pyt.centerY);
-                //     line2D.stroke();
-                //     line2D.closePath()
-                // }
-                // if(it.isBoundary && nxt.isBoundary) {
-                //     line2D.beginPath();
-                //     line2D.moveTo(it.centerX, it.centerY);
-                //     line2D.lineTo(nxt.centerX, nxt.centerY);
-                //     line2D.stroke();
-                //     line2D.closePath()
-                // }
-                // if(it.isBoundary && nx_nyt.isBoundary) {
-                //     line2D.beginPath();
-                //     line2D.moveTo(it.centerX, it.centerY);
-                //     line2D.lineTo(nx_nyt.centerX, nx_nyt.centerY);
-                //     line2D.stroke();
-                //     line2D.closePath()
-                // }
-                // if(it.isBoundary && nyt.isBoundary) {
-                //     line2D.beginPath();
-                //     line2D.moveTo(it.centerX, it.centerY);
-                //     line2D.lineTo(nyt.centerX, nyt.centerY);
-                //     line2D.stroke();
-                //     line2D.closePath()
-                // }
-                // if(it.isBoundary && px_nyt.isBoundary) {
-                //     line2D.beginPath();
-                //     line2D.moveTo(it.centerX, it.centerY);
-                //     line2D.lineTo(px_nyt.centerX, px_nyt.centerY);
-                //     line2D.stroke();
-                //     line2D.closePath()
-                // }
-                // if(it.isBoundary && pxt.isBoundary) {
-                //     line2D.beginPath();
-                //     line2D.moveTo(it.centerX, it.centerY);
-                //     line2D.lineTo(pxt.centerX, pxt.centerY);
-                //     line2D.stroke();
-                //     line2D.closePath()
-                // }
-                // if(it.isBoundary && pyt.isBoundary) {
-                //     line2D.beginPath();
-                //     line2D.moveTo(it.centerX, it.centerY);
-                //     line2D.lineTo(pyt.centerX, pyt.centerY);
-                //     line2D.stroke();
-                //     line2D.closePath()
-                // }
-
+        for (let y = 0; y < dots.length; y++) {
+            for (let x = 0; x < dots[y].length; x++) {
+                let dot = dots[y][x];
+                dot.indexY = y;
+                dot.indexX = x;
+                if (dot.draw && dot.around.length <= 0) {
+                    // line2D.strokeStyle = RandomUtil.rgb();
+                    line2D.beginPath();
+                    // console.log("start==dot", dot);
+                    line2D.moveTo(dot.centerX, dot.centerY);
+                    line2D.lineTo(dot.endX, dot.endY);
+                    this.drawLine(line2D, dots, y, x);
+                    // line2D.lineTo(dot.centerX, dot.centerY);
+                    // line2D.closePath();
+                    // line2D.stroke();
+                }
             }
         }
         //result
@@ -428,16 +353,17 @@ class Engine {
     // }
     private getAvgColor(data: ImageData): RGBA {
         let r = 0, g = 0, b = 0, a = 0;
-        const arrAvg = data.data.reduce((a,b) => a + b, 0) / data.data.length;
-        for (let i = 0; i < data.data.length; i+=4) {
+        const arrAvg = data.data.reduce((a, b) => a + b, 0) / data.data.length;
+        for (let i = 0; i < data.data.length; i += 4) {
             r += data.data[i];
-            g += data.data[i+1];
-            b += data.data[i+2];
-            a += data.data[i+3];
+            g += data.data[i + 1];
+            b += data.data[i + 2];
+            a += data.data[i + 3];
         }
         let cnt = data.data.length / 4;
         return new RGBA(r / cnt, g / cnt, b / cnt, 255);
     }
+
     getImageDataIndex(width: number, x: number, y: number): number {
         return ((y * width * 4) + (x * 4));
     }
@@ -470,28 +396,116 @@ class Engine {
     }
 
 
-    private drawLines(context2D: CanvasRenderingContext2D, lineTars: Dot[]) {
-        for (let i = 0; i < lineTars.length; i++) {
-            context2D.beginPath();
-            this.drawLine(context2D, lineTars[i]);
-            context2D.stroke();
-            context2D.closePath();
-        }
-    }
-    private drawLine(context2D: CanvasRenderingContext2D, it: Dot) {
-        let aroundBoundarys = it.aroundIsBoundaryIgnoreMy;
-        for (let i = 0; it.isBoundary && i < aroundBoundarys.length; i++) {
-            let next = aroundBoundarys[i];
-            // context2D.beginPath();
-            context2D.moveTo(it.centerX, it.centerY);
-            context2D.lineTo(next.centerX, next.centerY);
-            // context2D.stroke();
-            // context2D.closePath();
+    // private drawLines(context2D: CanvasRenderingContext2D, lineTars: Dot[]) {
+    //     for (let i = 0; i < lineTars.length; i++) {
+    //         context2D.beginPath();
+    //         this.drawLine(context2D, lineTars[i]);
+    //         context2D.stroke();
+    //         context2D.closePath();
+    //     }
+    // }
+    //
+    //
+    private drawLine(context2D: CanvasRenderingContext2D, dots: Array<Array<Dot>>, y: number, x: number, refer: Dot | undefined = undefined) {
 
-            next.around = next.around.filter((nit)=> nit.x != it.x && nit.y != it.y);
-            // console.log('--', next.around)
-            this.drawLine(context2D, next);
+        let dot = dots[y][x];
+        //   \ | /
+        //  -  +  -
+        //   / | \
+        let my = y - 1;
+        let mx = x - 1;
+        let px = x + 1;
+        let py = y + 1;
+        // context2D.moveTo(dot.centerX, dot.centerY);
+        // context2D.lineTo(dot.centerX+2, dot.centerY+2);
+        // if (dot.draw) {
+        //     context2D.lineTo(dot.centerX, dot.centerY);
+        // }
+        // if(dot.isAround(refer)) {
+        //     context2D.lineTo(dot.centerX, dot.centerY);
+        // }
+        if (dot.around.length <= 0 && dot.draw) {
+            if (my >= 0) {
+                let adot = dots[my][x];
+                adot.indexY = my;
+                adot.indexX = x;
+                dot.around.push(adot);
+            }
+            if (my >= 0 && px < dots[my].length) {
+                let adot = dots[my][px];
+                adot.indexY = my;
+                adot.indexX = px;
+                dot.around.push(adot);
+            }
+            if (px < dots[y].length) {
+                let adot = dots[y][px];
+                adot.indexY = y;
+                adot.indexX = px;
+                dot.around.push(adot);
+            }
+            if (py < dots.length && px < dots[py].length) {
+                let adot = dots[py][px];
+                adot.indexY = py;
+                adot.indexX = px;
+                dot.around.push(adot);
+            }
+            if (py < dots.length) {
+                let adot = dots[py][x];
+                adot.indexY = py;
+                adot.indexX = x;
+                dot.around.push(adot);
+            }
+            //
+            if (py < dots.length && mx >= 0) {
+                let adot = dots[py][mx];
+                adot.indexY = py;
+                adot.indexX = mx;
+                dot.around.push(adot);
+            }
+            if (mx >= 0) {
+                let adot = dots[y][mx];
+                adot.indexY = y;
+                adot.indexX = mx;
+                dot.around.push(adot);
+            }
+            if (my >= 0 && mx >= 0) {
+                let adot = dots[my][mx];
+                adot.indexY = my;
+                adot.indexX = mx;
+                dot.around.push(adot);
+            }
+            if (dot.isBoundary) {
+                context2D.strokeStyle = dot.bgColor.rgbHex;
+                context2D.lineTo(dot.centerX, dot.centerY);
+                context2D.stroke();
+                for (let i = 0; i < dot.around.length; i++) {
+                    context2D.moveTo(dot.centerX, dot.centerY);
+                    this.drawLine(context2D, dots, dot.around[i].indexY, dot.around[i].indexX, dot);
+                }
+            } else { // 전경색.채
+                context2D.strokeStyle = dot.bgColor.rgbHex;
+                context2D.moveTo(dot.centerX, dot.centerY);
+                context2D.lineTo(dot.endX, dot.endY);
+                context2D.stroke();
+            }
         }
+
+
+        // let px_my = y - 1;
+
+        // let aroundBoundarys = it.aroundIsBoundaryIgnoreMy;
+        // for (let i = 0; it.isBoundary && i < aroundBoundarys.length; i++) {
+        //     let next = aroundBoundarys[i];
+        //     // context2D.beginPath();
+        //     context2D.moveTo(it.centerX, it.centerY);
+        //     context2D.lineTo(next.centerX, next.centerY);
+        //     // context2D.stroke();
+        //     // context2D.closePath();
+        //
+        //     next.around = next.around.filter((nit)=> nit.x != it.x && nit.y != it.y);
+        //     // console.log('--', next.around)
+        //     this.drawLine(context2D, next);
+        // }
 
     }
 }
@@ -499,7 +513,8 @@ class Engine {
 const video = document.querySelector("#video") as HTMLVideoElement;
 const result = document.querySelector("#result") as HTMLCanvasElement;
 const record = document.querySelector("#record") as HTMLButtonElement;
-const capture = document.querySelector("#capture") as HTMLButtonElement;
+const captureNext = document.querySelector("#captureNext") as HTMLButtonElement;
+const capturePrevious = document.querySelector("#capturePrevious") as HTMLButtonElement;
 const url = document.querySelector("#url") as HTMLInputElement;
 
 
@@ -509,8 +524,11 @@ fromEvent(record, 'click').subscribe((e: MouseEvent) => {
     engine.videoUrl = url.value;
     engine.play();
 });
-fromEvent(capture, 'click').subscribe((e: MouseEvent) => {
-    engine.capture();
+fromEvent(captureNext, 'click').subscribe((e: MouseEvent) => {
+    engine.capture((1 / 5));
+});
+fromEvent(capturePrevious, 'click').subscribe((e: MouseEvent) => {
+    engine.capture(-(1 / 5));
 });
 
 export {engine};
