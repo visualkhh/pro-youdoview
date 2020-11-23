@@ -18,11 +18,11 @@ module.exports = {
         new CleanWebpackPlugin({
             cleanAfterEveryBuildPatterns: ['dist']
         }),
-        new CopyPlugin({
-            patterns: [
-                { from: "resources", to: "resources" },
-            ],
-        }),
+        // new CopyPlugin({
+        //     patterns: [
+        //         { from: "resources", to: "resources" },
+        //     ],
+        // }),
     ],
     resolve: {
         alias: {

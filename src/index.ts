@@ -47,9 +47,9 @@ class Engine {
         const angle = 3;
         const scaleUp = 1.02;
         const scaleDown = 0.98;
-        const diffSize = 2;
-        const dotGroupBoxSize = 4;
-        const dotAvgSize = 1;
+        const diffSize = 5;
+        const dotGroupBoxSize = 10;
+        const dotAvgSize = 10;
 
         // original
         const original2D = this.buffer2D;
@@ -284,13 +284,13 @@ class Engine {
         let line2D = this.buffer2D;
         let lineImageData = line2D.getImageData(0, 0, width, height);
         // // bg
-        for (let y = 0; y < dots.length; y++) {
-            for (let x = 0; x < dots[y].length; x++) {
-                let dot = dots[y][x];
-                line2D.fillStyle = "rgba("+dot.bgColor.r.toFixed()+","+dot.bgColor.g.toFixed()+","+dot.bgColor.b.toFixed()+",0.2)";
-                line2D.fillRect(dot.x, dot.y, dot.w, dot.h);
-            }
-        }
+        // for (let y = 0; y < dots.length; y++) {
+        //     for (let x = 0; x < dots[y].length; x++) {
+        //         let dot = dots[y][x];
+        //         line2D.fillStyle = "rgba("+dot.bgColor.r.toFixed()+","+dot.bgColor.g.toFixed()+","+dot.bgColor.b.toFixed()+",0.2)";
+        //         line2D.fillRect(dot.x, dot.y, dot.w, dot.h);
+        //     }
+        // }
 
         for (let y = 0; y < dots.length; y++) {
             for (let x = 0; x < dots[y].length; x++) {
@@ -306,7 +306,7 @@ class Engine {
                     this.drawLine(line2D, dots, y, x);
                     // line2D.lineTo(dot.centerX, dot.centerY);
                     // line2D.closePath();
-                    // line2D.stroke();
+                    line2D.stroke();
                 }
             }
         }
@@ -475,18 +475,18 @@ class Engine {
                 dot.around.push(adot);
             }
             if (dot.isBoundary) {
-                context2D.strokeStyle = dot.bgColor.rgbHex;
+                // context2D.strokeStyle = dot.bgColor.rgbHex;
                 context2D.lineTo(dot.centerX, dot.centerY);
-                context2D.stroke();
+                // context2D.stroke();
                 for (let i = 0; i < dot.around.length; i++) {
                     context2D.moveTo(dot.centerX, dot.centerY);
                     this.drawLine(context2D, dots, dot.around[i].indexY, dot.around[i].indexX, dot);
                 }
             } else { // 전경색.채
-                context2D.strokeStyle = dot.bgColor.rgbHex;
+                // context2D.strokeStyle = dot.bgColor.rgbHex;
                 context2D.moveTo(dot.centerX, dot.centerY);
                 context2D.lineTo(dot.endX, dot.endY);
-                context2D.stroke();
+                // context2D.stroke();
             }
         }
 
