@@ -269,7 +269,17 @@ class Engine {
             }
             dots.push(dotRow);
         }
-        this.temp2D.drawImage(dot2D.canvas, 0, 0, width, height);
+        this.getCanvas2D("#temp").drawImage(dot2D.canvas, 0, 0, width, height);
+
+
+        let avgColor2D = this.buffer2D;
+        dots.forEach((it) => {
+           it.forEach((sit) => {
+               avgColor2D.fillStyle = sit.bgColor.rgbHex;
+               avgColor2D.fillRect(sit.x, sit.y, sit.w, sit.h);
+           });
+        });
+        this.getCanvas2D("#temp2").drawImage(avgColor2D.canvas, 0, 0, width, height);
         //dot2D.putImageData(dotImageData, 0, 0);
         // let dotPixels = this.getPixels(boundaryImageData);
         // for (let y = 0; y < dotPixels.length; y++) {
@@ -299,13 +309,15 @@ class Engine {
                 dot.indexX = x;
                 if (dot.draw && dot.around.length <= 0) {
                     // line2D.strokeStyle = RandomUtil.rgb();
+                    // line2D.fillStyle = RandomUtil.rgb();
                     line2D.beginPath();
                     // console.log("start==dot", dot);
                     line2D.moveTo(dot.centerX, dot.centerY);
                     line2D.lineTo(dot.endX, dot.endY);
                     this.drawLine(line2D, dots, y, x);
                     // line2D.lineTo(dot.centerX, dot.centerY);
-                    // line2D.closePath();
+                    line2D.fill();
+                    line2D.closePath();
                     line2D.stroke();
                 }
             }
@@ -386,8 +398,9 @@ class Engine {
         return temp.getContext('2d')!
     }
 
-    get temp2D(): CanvasRenderingContext2D {
-        const temp = document.querySelector("#temp") as HTMLCanvasElement;
+
+    getCanvas2D(selectors: string): CanvasRenderingContext2D {
+        const temp = document.querySelector(selectors) as HTMLCanvasElement;
         const width = this.video.videoWidth;
         const height = this.video.videoHeight;
         temp.width = width;
