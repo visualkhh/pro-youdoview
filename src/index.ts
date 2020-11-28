@@ -9,6 +9,8 @@ const {map, filter, catchError} = require('rxjs/operators');
 
 class Engine {
 
+    public oldImageData: ImageData | undefined;
+
     constructor(private video: HTMLVideoElement, private canvas: HTMLCanvasElement) {
         this.init();
     }
@@ -37,9 +39,6 @@ class Engine {
     //     }, 1)
     // }
     capture(time: number, pause = true) {
-        this.video.currentTime = this.video.currentTime + time;
-        if (pause)
-            this.video.pause();
         const width = this.video.videoWidth;
         const height = this.video.videoHeight;
 
@@ -50,6 +49,10 @@ class Engine {
         const diffSize = 5;
         const dotGroupBoxSize = 10;
         const dotAvgSize = 10;
+
+        this.video.currentTime = this.video.currentTime + time;
+        if (pause)
+            this.video.pause();
 
         // original
         const original2D = this.buffer2D;
@@ -131,6 +134,19 @@ class Engine {
             let dr = 0;
             let dg = 0;
             let db = 0;
+
+            if(this.oldImageData) {
+                dr = or - this.oldImageData.data[i];
+                dg = og - this.oldImageData.data[i + 1];
+                db = ob - this.oldImageData.data[i + 2];
+                if (this.checkDiff(dr, dg, db, diffSize)) {
+                    boundaryImageData.data[i] = 100;
+                    boundaryImageData.data[i + 1] = 100;
+                    boundaryImageData.data[i + 2] = 100;
+                    boundaryImageData.data[i + 3] = 255;
+                }
+            }
+
             dr = or - angleImageData.data[i];
             dg = og - angleImageData.data[i + 1];
             db = ob - angleImageData.data[i + 2];
@@ -211,36 +227,32 @@ class Engine {
                 boundaryImageData.data[i + 2] = 100;
                 boundaryImageData.data[i + 3] = 255;
             }
-            // resuiltImageData.data[i] =  ;
-            // resuiltImageData.data[i + 1] =  ;
-            // resuiltImageData.data[i + 2] =  ;
         }
 
         //boundary
         boundary2D.putImageData(boundaryImageData, 0, 0);
-        //this.temp2D.drawImage(boundary2D.canvas, 0, 0, width, height);
+        this.getCanvas2D("#temp0").drawImage(boundary2D.canvas, 0, 0, width, height);
 
 
         //dotGroup
         let dot2D = this.buffer2D;
         let dotImageData = dot2D.getImageData(0, 0, width, height);
-        let boundaryPixels = this.getPixels(boundaryImageData);
-        for (let y = 0; y < boundaryPixels.length; y++) {
-            for (let x = 0; x < boundaryPixels[y].length; x++) {
-                let pixel = boundaryPixels[y][x];
-                let imageDataIndex = this.getImageDataIndex(dotImageData.width, x, y);
-                if (pixel.r && pixel.g && pixel.b) {
-                    dotImageData.data[imageDataIndex] = pixel.r;
-                    dotImageData.data[imageDataIndex + 1] = pixel.g;
-                    dotImageData.data[imageDataIndex + 2] = pixel.b;
-                    dotImageData.data[imageDataIndex + 3] = 255;
-                }
-            }
-        }
+        // let boundaryPixels = this.getPixels(boundaryImageData);
+        // for (let y = 0; y < boundaryPixels.length; y++) {
+        //     for (let x = 0; x < boundaryPixels[y].length; x++) {
+        //         let pixel = boundaryPixels[y][x];
+        //         let imageDataIndex = this.getImageDataIndex(dotImageData.width, x, y);
+        //         if (pixel.r && pixel.g && pixel.b) {
+        //             dotImageData.data[imageDataIndex] = pixel.r;
+        //             dotImageData.data[imageDataIndex + 1] = pixel.g;
+        //             dotImageData.data[imageDataIndex + 2] = pixel.b;
+        //             dotImageData.data[imageDataIndex + 3] = 255;
+        //         }
+        //     }
+        // }
         dot2D.putImageData(dotImageData, 0, 0);
         const dots = new Array<Array<Dot>>();
         dot2D.strokeStyle = "#FF0000";
-        // let boxPx = MathUtil.getValueByTotInPercent(dot2D.canvas.width, dotGroupWidthHeigtSize);
         for (let y = 0; y < dot2D.canvas.height; y += dotGroupBoxSize) {
             let h = dotGroupBoxSize;
             let distH = y + h;
@@ -269,7 +281,7 @@ class Engine {
             }
             dots.push(dotRow);
         }
-        this.getCanvas2D("#temp").drawImage(dot2D.canvas, 0, 0, width, height);
+        this.getCanvas2D("#temp1").drawImage(dot2D.canvas, 0, 0, width, height);
 
 
         let avgColor2D = this.buffer2D;
@@ -325,6 +337,7 @@ class Engine {
         //result
         this.result2D.drawImage(line2D.canvas, 0, 0, width, height);
 
+        this.oldImageData = originalImageData;
     }
 
     checkDiff(r: number, g: number, b: number, diffSize: number): boolean {
@@ -538,10 +551,10 @@ fromEvent(record, 'click').subscribe((e: MouseEvent) => {
     engine.play();
 });
 fromEvent(captureNext, 'click').subscribe((e: MouseEvent) => {
-    engine.capture((1 / 5));
+    engine.capture((1 / 20));
 });
 fromEvent(capturePrevious, 'click').subscribe((e: MouseEvent) => {
-    engine.capture(-(1 / 5));
+    engine.capture(-(1 / 20));
 });
 
 export {engine};
